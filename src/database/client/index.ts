@@ -1,4 +1,4 @@
-import { join } from 'path';
+import { exists } from 'fs';
 import { db } from './database.ts';
 import { sql } from 'kysely';
 import { jsonBuildObject } from 'kysely/helpers/postgres';
@@ -17,7 +17,6 @@ export class DatabaseClient {
             .selectAll()
             .executeTakeFirst();
 
-        db.destroy();
         return res;
     }
 
@@ -59,25 +58,113 @@ export class DatabaseClient {
         return res;
     }
 
-    async getPostData(userId: string, postId: string, limit: number) {
+    async testFc() {
+        const res = await db
+            .selectFrom('Post')
+            .selectAll('Post')
+            .leftJoin('User', 'Post.author_id', 'User.id')
+            .select('User.username')
+            .execute();
+
+        return res;
+    }
+    async getPosts(
+        //gets posts based on cursor, which is based on post id and created_at
+        userId: String,
+        cursor: { [key: string]: any } | undefined = undefined,
+        limit = 2,
+    ) {
+        let res = null;
+        if (!cursor) {
+            //if first fetch
+            res = await db
+                .selectFrom('Post')
+                .selectAll('Post')
+                .leftJoin('User', 'Post.author_id', 'User.id')
+                .select(['User.username', 'User.profile_url'])
+                .leftJoin(
+                    (qb) =>
+                        qb
+                            .selectFrom('UserPost')
+                            .selectAll()
+                            .where('UserPost.user_id', '=', userId)
+                            .as('UserPost'),
+                    (join) => join.onRef('UserPost.post_id', '=', 'Post.id'),
+                )
+                .selectAll('UserPost')
+                .orderBy('Post.created_at', 'desc')
+                .orderBy('Post.id', 'asc')
+                .limit(limit)
+                .execute();
+        } else {
+            //there is a cursor
+            if (cursor.created_at && cursor.post_id) {
+                res = await db //based on created at, and if tie, based on id
+                    .selectFrom('Post')
+                    .selectAll('Post')
+                    .leftJoin('User', 'Post.author_id', 'User.id')
+                    .select(['User.username', 'User.profile_url'])
+                    .leftJoin(
+                        (qb) =>
+                            qb
+                                .selectFrom('UserPost')
+                                .selectAll()
+                                .where('UserPost.user_id', '=', userId)
+                                .as('UserPost'),
+                        (join) =>
+                            join.onRef('UserPost.post_id', '=', 'Post.id'),
+                    )
+                    .selectAll('UserPost')
+                    .orderBy('Post.created_at', 'desc') //newest to oldest
+                    .orderBy('Post.id', 'asc') //smallest to biggest
+                    .where((eb) =>
+                        eb.and([
+                            eb('Post.created_at', '>=', cursor.created_at),
+                            eb('Post.id', '>', cursor.post_id),
+                        ]),
+                    )
+                    .limit(limit)
+                    .execute();
+            }
+        }
+        if (res && res.length > 0) {
+            const lastPost = res[0];
+            return lastPost
+                ? {
+                      cursor: {
+                          post_id: lastPost.id,
+                          created_at: lastPost.created_at,
+                      },
+                      result: res,
+                  }
+                : { result: res };
+        }
+        return null;
+        //maybe clustering? create view and get from here. return new cursor
+        //based on num likes and created at
+        //created at:
+    }
+    /*
+    async getUserPost(userId: string, postId: string, limit = 5) {
+        // gets the posts of a user
         const res = await db
             .selectFrom('Post')
             .selectAll('Post')
             .leftJoin('User', 'Post.author_id', 'User.id')
             .leftJoin(
-                (eb) =>
-                    eb
-                        .selectFrom('UserPost')
-                        .selectAll()
+                ({selectFrom, exists}) =>
+                    exists(
+                        selectFrom('UserPost')
+                        
                         .where('UserPost.user_id', '=', userId)
                         .where('UserPost.post_id', '=', postId)
-                        .as('userPost'),
+                    )
+                    .as('userPost'),
                 (join) => join.onRef('userPost.post_id', '=', 'Post.id'),
             )
             .select([
-                'userPost.user_id',
-                'userPost.has_liked',
-                'userPost.has_disliked',
+                'userPost.has_liked as has_liked',
+                'userPost.has_disliked as has_disliked',
             ])
             .select((eb) => [
                 'id',
@@ -87,10 +174,11 @@ export class DatabaseClient {
                 }).as('author'),
             ])
             .where('Post.id', '=', postId)
+            .limit(limit)
             .execute();
         return res;
     }
-
+    */
     destructor() {
         this.db.destroy();
     }

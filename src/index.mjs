@@ -1,6 +1,6 @@
 import express, { request } from 'express';
 import mockUsers from './util/mockUsers.js';
-import cookieParser from 'cookie-parser';
+//import cookieParser from 'cookie-parser';
 import session from 'express-session';
 import passport from 'passport';
 import { DatabaseClient } from './database/client/index.ts';
@@ -10,9 +10,10 @@ import './strategies/local-strategy.mjs';
 const app = express();
 
 app.use(express.json());
-app.use(cookieParser());
+//app.use(cookieParser());
 app.use(
     session({
+        name: 'sessionID', //override default session cookie name to avoid fingerprinting
         secret: 'default',
         saveUninitialized: false,
         resave: false,
@@ -59,7 +60,7 @@ app.get('/api/testCom', (req, res) => {
     }
     console.log(req.body);
     dbClient
-        .findCommunityUserData(req.body.userId, req.body.communityId)
+        .getCommunityUserData(req.body.userId, req.body.communityId)
         .then((result) => {
             console.log(result);
             res.status(200).send(result);
@@ -71,8 +72,20 @@ app.get('/api/testCom', (req, res) => {
 });
 
 app.get('/api/testPost', (req, res) => {
-    if (!req.body.userId || !req.body.communityId || !req.body.postId) {
-        return res.status(400).send('error, no body');
+    if (req.body && req.body.userId) {
+        dbClient
+            .getPosts(req.body.userId, req.body.cursor, req.body.limit)
+            .then((result) => {
+                console.log(result);
+                return res.status(200).send(result);
+            })
+            .catch((err) => {
+                console.error('Error fetching person:', err);
+                res.status(500).send('Error fetching person');
+            });
+        //return res.status(400).send('error, no body');
+    } else {
+        dbClient.getUserPost(req.body.userId, req.body);
     }
 });
 
@@ -82,6 +95,7 @@ app.get('/', (req, res) => {
     } = req;
     if (!filter && !value) {
         res.cookie('name', 'value', {
+            //additional cookie
             maxAge: 900000,
         });
         console.log(req.session);

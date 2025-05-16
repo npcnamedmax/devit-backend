@@ -6,7 +6,7 @@ import 'dotenv/config';
 
 const dialect = new PostgresDialect({
     pool: new pg.Pool({
-        database: process.env.testdb,
+        database: process.env.PGDB,
         host: process.env.PGHOST,
         user: process.env.PGUSER,
         port: Number(process.env.PGPORT),
