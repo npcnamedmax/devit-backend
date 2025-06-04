@@ -1,0 +1,3 @@
+todo: each query parameter add undefined 
+
+remove all isExist, replace with validUUID to speed things up.

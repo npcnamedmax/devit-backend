@@ -1,11 +1,15 @@
-import express, { request } from 'express';
-import mockUsers from './util/mockUsers.js';
+import express from 'express';
 //import cookieParser from 'cookie-parser';
 import session from 'express-session';
 import passport from 'passport';
-import { DatabaseClient } from './database/client/index.ts';
+//import { PostQuery } from './services/dbqueries/post/index.ts';
+
+import authRouter from './routes/auth/authRoutes.ts';
 
 import './strategies/local-strategy.mjs';
+import { DatabaseQuery } from './services/dbqueries/index.ts';
+//import { PostQuery } from './services/dbqueries/post/index.ts';
+import { CommunityQuery } from './services/dbqueries/community/index.ts';
 
 const app = express();
 
@@ -25,11 +29,47 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
+app.use(authRouter);
+
 const PORT = process.env.PORT || 3000;
 
-const dbClient = new DatabaseClient();
+const mainDB = new DatabaseQuery();
 
-app.listen(PORT, (err) => {
+/*
+app.get('/test', (req: express.Request, res: express.Response) => {
+    
+    PostQuery.addPost('472f0ad2-3f09-4391-a6d0-7616f5005bad')
+        .then((result) => {
+            res.status(200).send(result);
+        })
+        .catch((err) => {
+            console.log(err);
+            res.status(500).send(err);
+        });
+        
+});
+*/
+
+app.post('/testcom', (req: express.Request, res: express.Response) => {
+    const options = req.body;
+    if (!options.name || !options.description || !options.owner_id) {
+        res.status(500).send('invalid');
+    } else {
+        CommunityQuery.addCommunity({
+            name: options.name,
+            description: options.description,
+            owner_id: options.owner_id,
+        })
+            .then((result) => {
+                res.status(200).send(result);
+            })
+            .catch((err) => {
+                res.status(500).send(err);
+            });
+    }
+});
+
+const server = app.listen(PORT, (err) => {
     if (err) {
         console.error('Error starting server:', err);
         process.exit(1);
@@ -37,6 +77,24 @@ app.listen(PORT, (err) => {
     console.log('Server is running on port', PORT);
 });
 
+const cleanup = async () => {
+    try {
+        server.closeAllConnections();
+        await mainDB.destroy(); //clean up db
+        process.exit(0);
+    } catch (err) {
+        console.log(err);
+        process.exit(1);
+    }
+};
+
+process.stdin.resume();
+
+//on termination signals, do cleanup first
+process.on('SIGTERM', cleanup);
+process.on('SIGINT', cleanup);
+
+/*
 app.get('/api/test', (req, res) => {
     if (!req.body.id) {
         return res.status(400).send('error, no body');
@@ -128,82 +186,9 @@ app.post('/users', (req, res) => {
     }
 });
 
-app.post('/api/auth', passport.authenticate('local'), (req, res) => {
-    console.log(req.user);
-    console.log(req.session);
-    return res.sendStatus(200);
-});
-
-app.get('/api/auth/status', (req, res) => {
-    console.log(req.user);
-    console.log(req.session);
-    if (req.user) {
-        return res.status(200).send(req.session.user);
-    }
-    return res.status(401).send('Unauthorized');
-});
-
-app.post('/auth', passport.authenticate('local'), (req, res) => {
-    const {
-        body: { name, password },
-    } = req;
-    const findUser = mockUsers.find(
-        (user) => user.name === name && user.displayName === password,
-    );
-
-    if (!findUser) {
-        return res.status(401).send('Unauthorized');
-    }
-    req.session.user = findUser;
-    return res.status(200).send(findUser);
-});
-
-app.get('/auth/status', (req, res) => {
-    console.log(req.session.user);
-    if (req.session.user) {
-        return res.status(200).send(req.session.user);
-    }
-    return res.status(401).send('Unauthorized');
-});
-
-app.get('/auth/logout', (req, res) => {
-    if (!req.user) return res.status(401).send('Unauthorized');
-    req.logout((err) => {
-        //req.logout attached by passport.initialize()
-        //req.logout is attached to request after
-        if (err) {
-            console.error('Error logging out:', err);
-            return res.status(500).send('Error logging out');
-        }
-        req.session.destroy((err) => {
-            //to prevent session fixation attacks
-            if (err) {
-                console.error('Error destroying session:', err);
-                return res.status(500).send('Error logging out');
-            }
-            res.clearCookie('connect.sid'); // Clear the cookie
-            return res.status(200).send('Logged out successfully');
-        });
-    });
-});
-
-app.post('/auth/cart', (req, res) => {
-    if (!req.session.user) return res.status(401).send('Unauthorized');
-    const {
-        body: { item },
-    } = req;
-    const { cart } = req.session;
-    if (!cart) {
-        req.session.cart = [item];
-    } else {
-        cart.push(item);
-    }
-    console.log(req.session.cart);
-    return res.status(200).send(req.session.cart);
-});
-
 app.get('/:id', (req, res) => {
     const { id, name } = req.params;
     console.log(req.session.id);
     res.status(200).send(`Hello ${id} and ${name}`);
 });
+*/

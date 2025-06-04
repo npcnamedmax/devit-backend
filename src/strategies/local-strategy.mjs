@@ -25,7 +25,7 @@ do not watch, we invoke done(null, false). If everything went fine and we want t
 to the middleware. It's its job to determine what data from the user object should be stored in the session. 
 The result of the serializeUser method is attached to the 
 session as req.session.passport.user = { // our serialised user object, commonly user.id, not the whole user obj (to avoid session.passport.user data from going stale) // }.
-By modifying the session object, a cookie is created and sent to the client.
+By modifying the session object, a cookie is created and sent to the client. //req.session is created from express-session
 
 9.The result (the whole user object) is also attached to the request as req.user.
 

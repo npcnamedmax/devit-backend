@@ -5,6 +5,7 @@
 
 //to change password, change in psql (pg interactive shell)
 
+/*
 import dotenv from 'dotenv';
 dotenv.config({ path: '../../.env' });
 
@@ -23,3 +24,4 @@ try {
 } finally {
     await client.end();
 }
+*/
